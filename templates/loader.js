@@ -156,22 +156,44 @@ class Loader {
 
       // Step 4/4: wxFS persistence (restore + auto-sync)
       console.log("[Loader] 4/4 设置文件持久化...");
-      if (engine.rtenv && engine.rtenv.FS) {
+      const __safeFS = (function () {
+        try {
+          if (!engine.rtenv) return null;
+          const mod = engine.rtenv;
+          // Object.defineProperty getter for "FS" calls abort() on access.
+          // Use getOwnPropertyDescriptor to check before touching it.
+          const desc = Object.getOwnPropertyDescriptor(mod, "FS");
+          if (desc && typeof desc.get === "function") {
+            // It's an abort-triggering getter – FS is truly not exported.
+            console.warn("[wxfs] FS not exported (getter detected), wxfs disabled");
+            return null;
+          }
+          const fs = mod["FS"];
+          if (fs && typeof fs === "object") return fs;
+        } catch (e) {
+          console.warn("[wxfs] FS probe failed", e.message);
+        }
+        return null;
+      })();
+
+      if (__safeFS) {
         const persistPaths = engine.config.persistentPaths || ["/userfs"];
         for (const p of persistPaths) {
           try {
-            GameGlobal.__wxfs.restore(p, engine.rtenv.FS);
+            GameGlobal.__wxfs.restore(p, __safeFS);
           } catch (e) {
             console.warn("[wxfs] restore failed for", p, e);
           }
         }
       }
 
+      let _flushFS = __safeFS;
       setInterval(() => {
+        if (!_flushFS) return;
         try {
           const persistPaths = engine.config.persistentPaths || ["/userfs"];
           for (const p of persistPaths) {
-            GameGlobal.__wxfs.flush(p, engine.rtenv.FS);
+            GameGlobal.__wxfs.flush(p, _flushFS);
           }
         } catch (e) {
           console.warn("[wxfs] flush failed", e);
@@ -180,10 +202,11 @@ class Loader {
 
       // Flush on hide (user leaves minigame)
       wx.onHide(() => {
+        if (!_flushFS) return;
         try {
           const persistPaths = engine.config.persistentPaths || ["/userfs"];
           for (const p of persistPaths) {
-            GameGlobal.__wxfs.flush(p, engine.rtenv.FS);
+            GameGlobal.__wxfs.flush(p, _flushFS);
           }
         } catch (e) { /* ignore */ }
       });

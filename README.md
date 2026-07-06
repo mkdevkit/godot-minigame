@@ -30,9 +30,9 @@
    `CompileError: unexpected section <Exception>`——**连开发者工具模拟器默认也拒绝**，真机同样不支持。
    → 必须使用**无 EH / 无 SIMD 的小游戏兼容引擎**（`godot.js` + `godot.wasm.br`），用 `--engine` 传入。
 
-2. **引擎与 pck 的版本必须 major.minor 一致。**
-   Godot 只校验 `major.minor`（忽略 patch），故 4.6.1 引擎可加载 4.6.4 的 pck。
-   若报 “Pack version / 资源加载失败”，需换成同 minor 的兼容引擎模板。
+2. **引擎与 pck 必须同 Godot 版本（同一 patch）。**
+   UID 索引表由编辑器在导出时生成，不同 patch 版本（如 4.6.1 vs 4.6.4）的哈希不兼容，
+   报 `Unrecognized UID: ... (resource_uid.cpp:212)`。必须用**同 Godot 版本号**的编辑器导出 pck，并用该版本的引擎模板编译 wasm。
 
 3. **微信 `FileSystemManager` 不允许读取 `.pck`。** 已自动改名为 `engine/build.zip`。
 
@@ -46,6 +46,10 @@
 6. **需要 WebGL2**（Godot 4 Compatibility 渲染器 = GLES3/WebGL2），请使用较新基础库（≥ 3.2）。
 
 7. **开发者工具 `access_token expired` 等报错**属登录/游客态，与本适配无关。
+
+8. **微信禁止 `eval` 和 `new Function()`。** Godot jsbb 绑定的 `CompileFunctionSource` 依赖动态编译，会报 `eval is not a function`。这是引擎 C++ 源码层问题，需自编引擎时替换为 MinigameBuilder 或预编译绑定（参考 godot_for_minigame）。
+
+9. **Emscripten 未导出的属性会 `abort()`。** `rtenv.FS` 是 getter，访问未导出的 `FS` 会直接中止进程。loader 已改用 `mod["FS"]` 方括号安全探测。若自编引擎开启了 `FORCE_FILESYSTEM` 则 `FS` 可用，wxFS 会自动生效。
 
 ---
 

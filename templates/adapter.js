@@ -819,6 +819,8 @@ const _window = {
     return u;
   })(),
 
+  Blob: class { constructor(data, opts) { this.data = data || []; this.type = (opts && opts.type) || ""; this.size = (this.data || []).reduce((t, i) => t + ((i && i.length) || 0), 0); } },
+
   addEventListener: _addEventListener, removeEventListener: _removeEventListener,
   dispatchEvent: (e) => _dispatchEvent(e.type, e),
 
