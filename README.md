@@ -199,10 +199,51 @@ game.js
   写逻辑时用，同样走 `JavaScriptBridge`，异步接口返回 Promise。
 
 三者 API 一致，且**都不使用 `eval`**（走 `godot_js_wrapper_*`/自定义导入函数），
-在禁用 `eval` 的小游戏环境可用。接口：`login` / `get_user_profile` /
-`show_rewarded_video` / `show_interstitial` / `share` / `show_share_menu` /
-`vibrate` / `set/get_clipboard` / `storage_set/get/remove` / `get_system_info` /
-`configure`。异步结果统一为 `{ ok, data, err }`（C++ 版回传 JSON 串，GDScript 版回传 Dictionary）。
+在禁用 `eval` 的小游戏环境可用。
+
+### 已封装的平台能力
+
+#### 配置
+| 方法 | 调用 | 说明 |
+|---|---|---|
+| `configure(config)` | 同步 | 传入 `{ rewardedAdUnitId, interstitialAdUnitId }` 设置广告位 |
+
+#### 登录 / 用户信息
+| 方法 | 调用 | 参数 | 结果 |
+|---|---|---|---|
+| `login()` | 异步 | — | `{ code, anonymousCode }` |
+| `get_user_profile(desc?)` | 异步 | 授权描述文案（可选） | `{ userInfo: { nickName, avatarUrl, ... } }` |
+
+#### 广告
+| 方法 | 调用 | 参数 | 结果 |
+|---|---|---|---|
+| `show_rewarded_video(adUnitId?)` | 异步 | 广告位 ID（可选，默认用 configure 里的值） | `{ isEnded }` — 是否完整观看 |
+| `show_interstitial(adUnitId?)` | 异步 | 广告位 ID（可选） | `{ shown }` |
+
+#### 分享
+| 方法 | 调用 | 参数 | 说明 |
+|---|---|---|---|
+| `share(title?, imageUrl?, query?)` | 异步 | 标题 / 图片 / 自定义参数 | 主动拉起分享 |
+| `show_share_menu()` | 同步 | — | 显示右上角转发菜单 |
+
+#### 系统能力
+| 方法 | 调用 | 参数 | 结果 / 说明 |
+|---|---|---|---|
+| `vibrate(type?)` | 同步 | `"short"`（默认）/ `"long"` | 设备震动 |
+| `set_clipboard(text)` | 异步 | 要写入的文字 | — |
+| `get_clipboard()` | 异步 | — | `{ text }` |
+| `storage_set(key, value)` | 同步 | KV 键值对 | 写入持久化存储 |
+| `storage_get(key)` | 同步 | 键名 | `{ value }` |
+| `storage_remove(key)` | 同步 | 键名 | 删除指定键 |
+| `get_system_info()` | 同步 | — | 平台原始 systemInfo 对象 |
+| `get_platform()` | 同步 | — | `"wechat"` / `"douyin"` / `"unknown"` |
+
+#### 结果格式
+异步结果统一为 `{ ok: bool, data: {...}, err: string }`。
+传递方式：C++ 版通过信号回传 JSON 字符串；GDScript 版通过信号回传已解析的 Dictionary；
+GodotJS 版通过 `Promise` resolve 对象。
+
+> 登录只返回临时 `code`，需业务后端用平台密钥换 `openid`/`session_key`。适配层不做换取，避免密钥进客户端。
 
 ---
 
