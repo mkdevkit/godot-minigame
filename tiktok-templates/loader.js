@@ -201,7 +201,7 @@ class Loader {
       }, 5000);
 
       // Flush on hide (user leaves minigame)
-      wx.onHide(() => {
+      _api.onHide(() => {
         if (!_flushFS) return;
         try {
           const persistPaths = engine.config.persistentPaths || ["/userfs"];

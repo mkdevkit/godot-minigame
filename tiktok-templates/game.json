@@ -1,0 +1,9 @@
+{
+  "deviceOrientation": "{{{ORIENTATION}}}",
+  "enableIOSHighPerformanceMode": true,
+  "subPackages": [
+    { "name": "engine", "root": "engine/" },
+    { "name": "subpacks", "root": "subpacks/" }
+  ],
+  "workers": "js/worker"
+}

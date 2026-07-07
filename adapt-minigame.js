@@ -2,7 +2,7 @@
 /**
  * adapt-minigame.js
  * -----------------------------------------------------------------------------
- * Converts a Godot 4.x **Web export** into a WeChat Mini-Game project, in place.
+ * Converts a Godot 4.x **Web export** into a WeChat / Douyin Mini-Game project.
  *
  * Two engine modes:
  *   • default        — use the project's own <exe>.js / <exe>.wasm (only runs in
@@ -18,13 +18,22 @@
  *   1. Patch <engine>.js → js/libs/godot.js  (adapter globals + WebGL fallback +
  *      audio-worklet neutralise + expose Engine/Godot + wxFS persistence)
  *   2. Provide engine/<base>.wasm.br  (copy compatible .br, or Brotli the raw .wasm)
- *   3. Copy .pck → engine/<exe>.zip  (WeChat's file reader denies the .pck ext)
- *   4. Emit runtime layer (adapter.js / fetch.js / wxfs-adapter.js / game.js /
- *      js/loader.js / js/image_loader.js / js/worker/position_reporting.js)
+ *   3. Copy .pck → engine/<exe>.zip  (mini-game file reader denies the .pck ext)
+ *   4. Emit runtime layer (adapter.js / fetch.js / wxfs-adapter.js / minigame-sdk.js /
+ *      game.js / js/loader.js / js/image_loader.js / js/worker/position_reporting.js)
  *   5. Write game.json (subpackages + workers) + subpackage placeholders
  *
  * Usage:
- *   node tools/adapt-minigame.js --engine tools/engine --exe build --src game --orientation portrait
+ *   node tools/adapt-minigame.js --platform wechat --engine tools/engine --src game
+ *   node tools/adapt-minigame.js --platform tiktok --out dist/tiktok --engine tools/engine --src game --orientation landscape
+ *
+ * Flags:
+ *   --platform  wechat | tiktok   target mini-game platform            (default wechat)
+ *   --out       <dir>             output project dir (relative to root) (default: project root)
+ *   --engine    <dir>            mini-game compatible engine dir (godot.js + godot.wasm.br)
+ *   --src       <dir>            dir holding <exe>.js/.wasm/.pck        (default game)
+ *   --exe       <name>           project export base name              (default build)
+ *   --orientation portrait|landscape                                   (default portrait)
  *
  * Re-runnable / idempotent.
  * -----------------------------------------------------------------------------
@@ -38,13 +47,27 @@ function arg(name, def) {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : def;
 }
 const ROOT = path.resolve(__dirname, "..");
-const TPL = path.join(__dirname, "templates");
+
+// ── platform ──────────────────────────────────────────────────────────────────
+const PLATFORM = (arg("platform", "wechat") || "wechat").toLowerCase();
+const PLATFORMS = {
+  wechat: { label: "WeChat", tpl: "wechat-templates" },
+  tiktok: { label: "Douyin", tpl: "tiktok-templates" },
+};
+if (!PLATFORMS[PLATFORM]) {
+  throw new Error(`unknown --platform "${PLATFORM}" (expected: ${Object.keys(PLATFORMS).join(" | ")})`);
+}
+const PLAT = PLATFORMS[PLATFORM];
+const TPL = path.join(__dirname, PLAT.tpl);
+
+// ── paths ─────────────────────────────────────────────────────────────────────
+const OUT = path.resolve(ROOT, arg("out", "."));       // output project dir
 const EXE = arg("exe", "build");                       // project export base name
 const SRC = path.join(ROOT, arg("src", "game"));       // dir holding <exe>.js/.wasm/.pck
 const ENGINE = arg("engine", "");                      // compatible engine dir (godot.js + godot.wasm.br)
 const ENGINE_DIR = ENGINE ? path.resolve(ROOT, ENGINE) : "";
 const ORIENTATION = arg("orientation", "portrait");
-const PCK_EXT = "zip";                                 // WeChat FS refuses to read .pck
+const PCK_EXT = "zip";                                 // mini-game FS refuses to read .pck
 
 const BASE = ENGINE_DIR ? "godot" : EXE;               // engine file base name
 const EXECUTABLE = `engine/${BASE}`;
@@ -118,7 +141,13 @@ function patchGodotJs() {
     'GodotFS._syncing=true;try{if(typeof GameGlobal!=="undefined"&&GameGlobal.__wxfs){GodotFS._mount_points.forEach(function(p){GameGlobal.__wxfs.flush(p,FS)})}}catch(wxe){GodotRuntime.error("[wxfs] flush failed: "+wxe.message)}GodotFS._syncing=false;return Promise.resolve(null)',
     "wxFS flush (GodotFS.sync)");
 
-  const dst = path.join(ROOT, "js/libs/godot.js");
+  // Fix doInit: add .catch(reject) so Godot/initFS failures propagate
+  replaceOnce(
+    'resolve();\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t});',
+    'resolve();\n\t\t\t\t\t\t\t\t}).catch(reject);\n\t\t\t\t\t\t\t}).catch(reject);\n\t\t\t\t\t\t}).catch(reject);\n\t\t\t\t\t});',
+    "doInit error propagation (.catch(reject))");
+
+  const dst = path.join(OUT, "js/libs/godot.js");
   ensureDir(path.dirname(dst));
   fs.writeFileSync(dst, c);
   log(`[1] Patched js/libs/godot.js  (source: ${path.relative(ROOT, srcJs)})`);
@@ -127,7 +156,7 @@ function patchGodotJs() {
 
 // ── 2. engine wasm → engine/<base>.wasm.br ────────────────────────────────────
 function provideWasm() {
-  const dst = path.join(ROOT, WASM_BR);
+  const dst = path.join(OUT, WASM_BR);
   ensureDir(path.dirname(dst));
   if (ENGINE_DIR) {
     copy(path.join(ENGINE_DIR, "godot.wasm.br"), dst);
@@ -152,23 +181,23 @@ function provideWasm() {
 
 // ── 3. copy pck (renamed) + audio worklets + splash into engine/ ──────────────
 function copyAssets() {
-  copy(path.join(SRC, `${EXE}.pck`), path.join(ROOT, MAIN_PACK));
-  log(`[3] Copied ${EXE}.pck → ${MAIN_PACK} (renamed: WeChat FS denies .pck)`);
+  copy(path.join(SRC, `${EXE}.pck`), path.join(OUT, MAIN_PACK));
+  log(`[3] Copied ${EXE}.pck → ${MAIN_PACK} (renamed: mini-game FS denies .pck)`);
   const worklets = [
     [`${EXE}.audio.worklet.js`, `${BASE}.audio.worklet.js`],
     [`${EXE}.audio.position.worklet.js`, `${BASE}.audio.position.worklet.js`],
   ];
   for (const [from, to] of worklets) {
     const f = path.join(SRC, from);
-    if (fs.existsSync(f)) { copy(f, path.join(ROOT, "engine", to)); log(`    Copied ${from} → engine/${to}`); }
+    if (fs.existsSync(f)) { copy(f, path.join(OUT, "engine", to)); log(`    Copied ${from} → engine/${to}`); }
   }
   const png = path.join(SRC, `${EXE}.png`);
-  if (fs.existsSync(png)) { copy(png, path.join(ROOT, "images/logo.png")); log("    Copied splash → images/logo.png"); }
+  if (fs.existsSync(png)) { copy(png, path.join(OUT, "images/logo.png")); log("    Copied splash → images/logo.png"); }
 }
 
 // ── prune stale files from engine/ ────────────────────────────────────────────
 function pruneEngine() {
-  const dir = path.join(ROOT, "engine");
+  const dir = path.join(OUT, "engine");
   if (!fs.existsSync(dir)) return;
   for (const f of fs.readdirSync(dir)) {
     if (!KEEP_IN_ENGINE.has(f)) {
@@ -180,7 +209,7 @@ function pruneEngine() {
 
 // ── 4. runtime layer ──────────────────────────────────────────────────────────
 function tpl(name) { return fs.readFileSync(path.join(TPL, name), "utf8"); }
-function writeOut(rel, content) { const p = path.join(ROOT, rel); ensureDir(path.dirname(p)); fs.writeFileSync(p, content); log("    " + rel); }
+function writeOut(rel, content) { const p = path.join(OUT, rel); ensureDir(path.dirname(p)); fs.writeFileSync(p, content); log("    " + rel); }
 
 function emitRuntime() {
   log("[4] Runtime layer");
@@ -193,6 +222,7 @@ function emitRuntime() {
   writeOut("audio-compat.js", tpl("audio-compat.js"));
   writeOut("fetch.js", tpl("fetch.js"));
   writeOut("wxfs-adapter.js", tpl("wxfs-adapter.js"));
+  writeOut("minigame-sdk.js", tpl("minigame-sdk.js"));
   writeOut("game.js", tpl("game.js"));
 
   const loader = tpl("loader.js")
@@ -207,25 +237,38 @@ function emitRuntime() {
   writeOut("subpacks/game.js", "// reserved subpackage placeholder\n");
 }
 
-// ── 5. game.json ──────────────────────────────────────────────────────────────
+// ── 5. game.json (+ minimal project.config.json when writing a fresh --out) ────
 function writeGameJson() {
-  fs.writeFileSync(path.join(ROOT, "game.json"), tpl("game.json").replace("{{{ORIENTATION}}}", ORIENTATION));
-  log("[5] Wrote game.json (orientation=" + ORIENTATION + ")");
+  fs.writeFileSync(path.join(OUT, "game.json"), tpl("game.json").replace("{{{ORIENTATION}}}", ORIENTATION));
+  log("[5] Wrote game.json (platform=" + PLATFORM + ", orientation=" + ORIENTATION + ")");
+
+  // Emit a minimal project.config.json for dedicated output dirs that lack one,
+  // so the folder can be imported into DevTools directly.
+  const pcfg = path.join(OUT, "project.config.json");
+  if (path.resolve(OUT) !== path.resolve(ROOT) && !fs.existsSync(pcfg)) {
+    const cfg = {
+      description: `Godot mini-game (${PLAT.label})`,
+      setting: { es6: true },
+      packOptions: { ignore: [{ type: "folder", value: "game" }, { type: "folder", value: "tools" }] },
+    };
+    fs.writeFileSync(pcfg, JSON.stringify(cfg, null, 2));
+    log("    project.config.json (minimal)");
+  }
 }
 
 (function main() {
-  log(`\n=== adapt-minigame  engine=${ENGINE_DIR ? path.relative(ROOT, ENGINE_DIR) : "(project self)"}  exe=${EXE}  orientation=${ORIENTATION} ===\n`);
+  log(`\n=== adapt-minigame  platform=${PLATFORM}(${PLAT.label})  engine=${ENGINE_DIR ? path.relative(ROOT, ENGINE_DIR) : "(project self)"}  exe=${EXE}  out=${path.relative(ROOT, OUT) || "."}  orientation=${ORIENTATION} ===\n`);
   patchGodotJs();
   provideWasm();
   copyAssets();
   pruneEngine();
   emitRuntime();
   writeGameJson();
-  log("\n=== Done. Import the project root into WeChat DevTools (MiniGame). ===");
+  log("\n=== Done. Import the output dir into " + PLAT.label + " DevTools (MiniGame). ===");
   if (!ENGINE_DIR) {
     log("WARNING: using the project's own WASM. Standard Godot Web exports use wasm-eh,");
-    log("which WXWebAssembly rejects (CompileError). Re-run with --engine <dir> pointing");
-    log("at a mini-game compatible engine (godot.js + godot.wasm.br).\n");
+    log("which WXWebAssembly/TTWebAssembly rejects (CompileError). Re-run with --engine <dir>");
+    log("pointing at a mini-game compatible engine (godot.js + godot.wasm.br).\n");
   } else {
     log(`Engine: mini-game compatible build from ${path.relative(ROOT, ENGINE_DIR)} (EH-free).`);
     log("The engine major.minor must match the .pck; patch differences are fine.\n");

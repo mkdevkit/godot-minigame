@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+Import("env")
+Import("env_modules")
+
+env_minigame = env_modules.Clone()
+env_minigame.add_source_files(env.modules_sources, "*.cpp")
+
+# On the Web platform, register the JS library that implements the
+# godot_js_mg_* imports declared as extern "C" in minigame_sdk.cpp.
+if env["platform"] == "web":
+    env.AddJSLibraries(["js/library_godot_minigame.js"])
