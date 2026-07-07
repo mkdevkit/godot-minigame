@@ -260,6 +260,23 @@ GodotJS 版通过 `Promise` resolve 对象。
 
 ---
 
-## 八、来源与许可
+## 八、引擎补丁
+
+微信小游戏不支持 wasm-eh 编译，需要在 `platform/web/detect.py` 把下面两处 'wasm' 改成 'emscripten'。
+
+```python
+env.Append(CCFLAGS=["-sSUPPORT_LONGJMP='emscripten'"])
+env.Append(LINKFLAGS=["-sSUPPORT_LONGJMP='emscripten'"])
+```
+另微信小游戏不支持 `eval`
+关闭javascript_eval需要加javascript_eval=no 如果需要用javascript(GodotJS)开发，需要加use_quickjs_ng=yes（不使用微信的js环境,编译一个js虚拟机在微信里跑，因为微信wasm会使用高性能模式跑，所以性能还可以接受，相当于unity使用lua开发微信小游戏）
+
+```shell
+scons platform=web target=template_release optimize=size_extra lto=full disable_3d=yes disable_advanced_gui=yes module_mono_enabled=no module_xr_enabled=no module_webxr_enabled=no module_multiplayer_enabled=no module_text_server_adv_enabled=no module_text_server_fb_enabled=yes module_bmp_enabled=no module_dds_enabled=no module_hdr_enabled=no module_ktx_enabled=no module_tga_enabled=no disable_audio_speech=yes module_spine_godot_enabled=yes threads=no javascript_eval=no use_quickjs_ng=yes
+```
+
+---
+
+## 九、来源与许可
 - `adapter.js` / `fetch.js` / `image_loader.js` / `worker/position_reporting.js` 复用并改编自 [AnranS/godot_for_minigame](https://github.com/AnranS/godot_for_minigame)（MIT）。
 - `wxfs-adapter.js` / `audio-compat.js` 基于使用者提供的适配代码整理。
