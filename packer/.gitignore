@@ -1,0 +1,12 @@
+# deps / build
+node_modules
+dist
+dist-ssr
+
+# tauri / rust
+src-tauri/target
+src-tauri/gen/schemas
+
+# misc
+*.local
+.DS_Store

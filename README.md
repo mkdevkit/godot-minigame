@@ -79,6 +79,10 @@ tools/
     └── README.md              # 集成说明与 API 一览
 ```
 
+> 另有 `tools/packer/` —— 图形化打包工具（Tauri v2 + Vue3），把本脚本的适配流程做成
+> 桌面 GUI，用 Rust 原生重写适配逻辑并把模板编译期嵌入，产出**自包含单文件 exe**
+> （运行时不依赖 Node）。详见 [`tools/packer/README.md`](./packer/README.md)。
+
 > 运行时文件（adapter/fetch/loader/audio-compat/wxfs-adapter/image_loader/game.js/minigame-sdk/worker）
 > 内部统一用 `_api = wx || tt`，微信/抖音两套模板内容一致，**差异只在 `game.json`**：
 > - 微信：`subpackages`（或驼峰）、`workers` 为对象、`iOSHighPerformance`

@@ -1,0 +1,138 @@
+:root {
+  --bg: #0f1115;
+  --card: #171a21;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --muted: #9aa3b2;
+  --accent: #4f8cff;
+  --ok: #35c48a;
+  --fail: #ff6b6b;
+  font-family: -apple-system, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+}
+
+header h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+.sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 18px 20px;
+  margin-bottom: 16px;
+}
+
+.row { margin-bottom: 14px; }
+.row.two { display: flex; gap: 16px; }
+.row.two > div { flex: 1; }
+
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.req { color: var(--fail); }
+
+input {
+  width: 100%;
+  background: #0f1218;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 13px;
+  outline: none;
+}
+input:focus { border-color: var(--accent); }
+
+.pick { display: flex; gap: 8px; }
+.pick input { flex: 1; }
+.pick button {
+  white-space: nowrap;
+  background: #232836;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+.pick button:hover { border-color: var(--accent); }
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.seg button {
+  background: #0f1218;
+  color: var(--muted);
+  border: none;
+  padding: 9px 18px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.seg button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+.run {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 26px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.run:disabled { opacity: 0.5; cursor: not-allowed; }
+.ok { color: var(--ok); }
+.fail { color: var(--fail); }
+
+.logs .log-head {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.logs pre {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  background: #0b0d12;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
